@@ -8,9 +8,16 @@
         'daily_hours' => (float) $appliance->daily_hours,
         'days_per_month' => $appliance->days_per_month,
         'usage_factor' => (float) $appliance->usage_factor,
+        'photo_url' => $appliance->photoUrl(),
     ];
 @endphp
 <div class="flex shrink-0 items-center justify-end gap-1">
+    @if ($showDetail ?? true)
+        <a href="{{ route('appliances.show', $appliance) }}" class="btn-ghost px-2" title="Detail {{ $appliance->name }}">
+            <x-icon name="eye" class="size-4" />
+            <span class="sr-only">Detail {{ $appliance->name }}</span>
+        </a>
+    @endif
     <button
         type="button"
         class="btn-ghost px-2"

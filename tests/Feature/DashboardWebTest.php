@@ -7,6 +7,7 @@ use App\Models\CalculationPeriod;
 use App\Models\Household;
 use App\Models\RecommendationHistory;
 use App\Models\User;
+use App\Services\Calculation\EnergyCalculationEngine;
 use Database\Seeders\ApplianceCategorySeeder;
 use Database\Seeders\ExpertRuleSeeder;
 use Database\Seeders\HouseholdSeeder;
@@ -171,20 +172,54 @@ class DashboardWebTest extends TestCase
         $response->assertStatus(200)
             ->assertSee('WattWise')
             ->assertSee($this->household->name)
-            ->assertSee('Perkiraan tagihan')
-            ->assertSee('Rekomendasi hemat energi')
-            ->assertSee('Peralatan listrik')
-            ->assertSee('Catatan meteran PLN')
-            ->assertSee('Kenapa saran ini muncul?');
+            ->assertSee('Selamat datang di Watt')
+            ->assertSee('Total konsumsi energi')
+            ->assertSee('Estimasi biaya')
+            ->assertSee('Jumlah perangkat')
+            ->assertSee('Grafik konsumsi energi')
+            ->assertSee('Perangkat paling boros')
+            ->assertSee('Rekomendasi cepat hari ini')
+            ->assertSee('Ringkasan rekomendasi')
+            ->assertSee(route('recommendations.index'), false)
+            // Dashboard is a summary only: full lists live on their own pages.
+            ->assertDontSee('Catatan meteran PLN')
+            ->assertDontSee('Kenapa saran ini muncul?');
     }
 
-    public function test_dashboard_lists_each_appliance_with_edit_and_delete_actions(): void
+    public function test_dashboard_shows_appliance_illustrations(): void
     {
-        $appliance = $this->household->appliances->first();
+        $fridge = $this->household->appliances->first(fn ($appliance) => str_contains($appliance->name, 'Kulkas'));
 
         $this->get(route('dashboard'))
             ->assertOk()
+            ->assertSee('role="img" aria-label="'.$fridge->name.'"', false);
+    }
+
+    public function test_kpis_compare_with_last_months_period(): void
+    {
+        $engine = app(EnergyCalculationEngine::class);
+        $previous = $engine->calculateHouseholdPeriod(
+            $this->household,
+            now()->subMonthNoOverflow()->startOfMonth(),
+            now()->subMonthNoOverflow()->endOfMonth()
+        );
+        $previous->update(['total_estimated_kwh' => 1000, 'total_estimated_cost' => 2000000]);
+
+        $this->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('▼')
+            ->assertSee('dibanding bulan lalu')
+            ->assertDontSee('Belum ada data bulan lalu');
+    }
+
+    public function test_appliance_page_lists_each_appliance_with_detail_edit_and_delete_actions(): void
+    {
+        $appliance = $this->household->appliances->first();
+
+        $this->get(route('appliances.index'))
+            ->assertOk()
             ->assertSee($appliance->name)
+            ->assertSee(route('appliances.show', $appliance), false)
             ->assertSee(route('appliances.update', $appliance), false)
             ->assertSee(route('appliances.destroy', $appliance), false);
     }
@@ -204,8 +239,9 @@ class DashboardWebTest extends TestCase
         ]);
 
         $household = $user->households()->sole();
-        $response->assertRedirect(route('dashboard', ['household_id' => $household->id]))
-            ->assertSessionHas('status');
+        $response->assertRedirect(route('dashboard'))
+            ->assertSessionHas('status')
+            ->assertSessionHas('active_household_id', $household->id);
 
         $this->get(route('dashboard', ['household_id' => $household->id]))
             ->assertOk()
@@ -246,9 +282,9 @@ class DashboardWebTest extends TestCase
 
     public function test_reanalyze_action_triggers_forward_chaining(): void
     {
-        $response = $this->post(route('households.reanalyze', $this->household->id));
+        $response = $this->from(route('analysis.index'))->post(route('households.reanalyze', $this->household->id));
 
-        $response->assertRedirect(route('dashboard', ['household_id' => $this->household->id]))
+        $response->assertRedirect(route('analysis.index'))
             ->assertSessionHas('status');
 
         $this->assertDatabaseHas('calculation_periods', [

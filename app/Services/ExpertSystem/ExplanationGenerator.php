@@ -125,6 +125,24 @@ class ExplanationGenerator
     }
 
     /**
+     * Describe a rule condition in plain words, e.g. "durasi pemakaian ≥ 8,0 jam/hari".
+     *
+     * @param  array<string, string>  $valueLabels  Raw comparison value => display label (e.g. category codes to names).
+     */
+    public function describeCondition(RuleCondition $condition, array $valueLabels = []): string
+    {
+        $param = $condition->parameter_name;
+        $value = $condition->operator === 'IN'
+            ? implode(', ', array_map(
+                fn (string $item): string => $valueLabels[trim($item)] ?? trim($item),
+                explode(',', $condition->comparison_value)
+            ))
+            : ($valueLabels[$condition->comparison_value] ?? $this->formatComparisonValue($param, $condition->operator, $condition->comparison_value));
+
+        return sprintf('%s %s %s', $this->labelFor($param), self::OPERATOR_LABELS[$condition->operator] ?? $condition->operator, $value);
+    }
+
+    /**
      * Human-readable label of a fact.
      */
     public function labelFor(string $param): string

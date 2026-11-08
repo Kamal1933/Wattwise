@@ -72,17 +72,59 @@ const setupDialogs = () => {
 
     const dialogWithErrors = document.body.dataset.reopenDialog;
     if (dialogWithErrors) {
-        document.getElementById(dialogWithErrors)?.showModal();
+        const target = document.getElementById(dialogWithErrors);
+
+        if (target instanceof HTMLDialogElement) {
+            target.showModal();
+        } else {
+            target?.scrollIntoView({ block: 'start' });
+        }
     }
+};
+
+const showPhotoPreview = (form, url) => {
+    const preview = form.querySelector('[data-photo-preview]');
+    const placeholder = form.querySelector('[data-photo-placeholder]');
+    if (!preview) {
+        return;
+    }
+    preview.src = url ?? '';
+    preview.classList.toggle('hidden', !url);
+    placeholder?.classList.toggle('hidden', Boolean(url));
+};
+
+const setupPhotoInputs = () => {
+    document.querySelectorAll('[data-photo-input]').forEach((input) => {
+        input.addEventListener('change', () => {
+            const file = input.files?.[0];
+            const form = input.closest('form');
+            showPhotoPreview(form, file ? URL.createObjectURL(file) : null);
+            const remove = form.querySelector('[data-photo-remove]');
+            if (file && remove) {
+                remove.checked = false;
+            }
+        });
+    });
 };
 
 const fillApplianceForm = (dialog, appliance) => {
     const form = dialog.querySelector('form');
     form.action = appliance.update_url;
 
+    const photoInput = form.querySelector('[data-photo-input]');
+    if (photoInput) {
+        photoInput.value = '';
+    }
+    const removePhoto = form.querySelector('[data-photo-remove]');
+    if (removePhoto) {
+        removePhoto.checked = false;
+        removePhoto.closest('label').classList.toggle('hidden', !appliance.photo_url);
+    }
+    showPhotoPreview(form, appliance.photo_url);
+
     Object.entries(appliance).forEach(([field, value]) => {
         const input = form.elements.namedItem(field);
-        if (input && 'value' in input) {
+        if (input && 'value' in input && input.type !== 'file') {
             input.value = value;
         }
     });
@@ -353,6 +395,15 @@ onReady(() => {
     setupDialogs();
     setupRecommendationFilter();
     setupApplianceSearch();
+    setupPhotoInputs();
     setupLandingCalculator();
     setupCountUp();
+});
+
+document.addEventListener('click', (event) => {
+    document.querySelectorAll('details[data-user-menu][open]').forEach((menu) => {
+        if (!menu.contains(event.target)) {
+            menu.removeAttribute('open');
+        }
+    });
 });

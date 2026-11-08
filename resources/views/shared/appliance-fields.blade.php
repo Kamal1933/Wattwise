@@ -35,4 +35,21 @@
         <input id="{{ $fieldPrefix }}-factor" name="usage_factor" type="number" step="0.05" min="0.05" max="1" required class="field-input" value="{{ $useOld ? old('usage_factor') : 1 }}">
         <p class="field-hint">1 untuk lampu atau TV, 0,7 AC inverter, 0,5 kulkas.</p>
     </div>
+    <div class="sm:col-span-2">
+        <label for="{{ $fieldPrefix }}-photo" class="field-label">Foto perangkat <span class="font-normal text-slate-400">(opsional)</span></label>
+        <div class="flex items-center gap-4">
+            <span class="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-ice ring-1 ring-slate-200">
+                <img src="" alt="" class="hidden size-full object-cover" data-photo-preview>
+                <x-icon name="camera" class="size-6 text-slate-400" data-photo-placeholder />
+            </span>
+            <input id="{{ $fieldPrefix }}-photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" class="field-input file:mr-3 file:rounded-lg file:border-0 file:bg-electric-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-electric" data-photo-input>
+        </div>
+        <p class="field-hint">Foto alat Anda sendiri, format JPG, PNG, atau WEBP, maksimal 2 MB. Di HP bisa langsung memotret.</p>
+        @if ($fieldPrefix === 'edit')
+            <label class="mt-2 flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" name="remove_photo" value="1" class="rounded border-slate-300 accent-electric" data-photo-remove>
+                Hapus foto yang ada dan pakai gambar bawaan
+            </label>
+        @endif
+    </div>
 </div>
