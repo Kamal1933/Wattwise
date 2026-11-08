@@ -37,7 +37,7 @@ class DashboardWebTest extends TestCase
     {
         auth()->logout();
 
-        $this->get('/')->assertRedirect(route('login'));
+        $this->get(route('dashboard'))->assertRedirect(route('login'));
         $this->post(route('households.reanalyze', $this->household->id))->assertRedirect(route('login'));
     }
 
@@ -72,7 +72,7 @@ class DashboardWebTest extends TestCase
     {
         $this->actingAs(User::factory()->create());
 
-        $this->get('/')
+        $this->get(route('dashboard'))
             ->assertOk()
             ->assertDontSee($this->household->name);
     }
@@ -105,7 +105,7 @@ class DashboardWebTest extends TestCase
 
     public function test_repeated_reanalysis_keeps_a_single_period_per_month(): void
     {
-        $this->get('/')->assertOk();
+        $this->get(route('dashboard'))->assertOk();
         $this->post(route('households.reanalyze', $this->household->id));
         $this->post(route('households.reanalyze', $this->household->id));
 
@@ -166,14 +166,82 @@ class DashboardWebTest extends TestCase
 
     public function test_dashboard_renders_successfully(): void
     {
-        $response = $this->get('/');
+        $response = $this->get(route('dashboard'));
 
         $response->assertStatus(200)
             ->assertSee('WattWise')
             ->assertSee($this->household->name)
-            ->assertSee('Estimasi Konsumsi')
-            ->assertSee('Rekomendasi Sistem Pakar')
-            ->assertSee('Inventaris Peralatan Listrik');
+            ->assertSee('Perkiraan tagihan')
+            ->assertSee('Rekomendasi hemat energi')
+            ->assertSee('Peralatan listrik')
+            ->assertSee('Catatan meteran PLN')
+            ->assertSee('Kenapa saran ini muncul?');
+    }
+
+    public function test_dashboard_lists_each_appliance_with_edit_and_delete_actions(): void
+    {
+        $appliance = $this->household->appliances->first();
+
+        $this->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee($appliance->name)
+            ->assertSee(route('appliances.update', $appliance), false)
+            ->assertSee(route('appliances.destroy', $appliance), false);
+    }
+
+    public function test_user_can_add_a_household_from_the_dashboard(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $this->get(route('dashboard'))->assertOk()->assertSee('Selamat datang di WattWise');
+
+        $response = $this->post(route('dashboard.households.store'), [
+            'name' => 'Rumah Bandung',
+            'tariff_id' => $this->household->tariff_id,
+            'address' => 'Jl. Dago 1',
+            'occupant_count' => 2,
+        ]);
+
+        $household = $user->households()->sole();
+        $response->assertRedirect(route('dashboard', ['household_id' => $household->id]))
+            ->assertSessionHas('status');
+
+        $this->get(route('dashboard', ['household_id' => $household->id]))
+            ->assertOk()
+            ->assertSee('Rumah Bandung')
+            ->assertSee('Belum ada peralatan aktif');
+    }
+
+    public function test_invalid_appliance_form_reopens_its_dialog_with_errors(): void
+    {
+        $this->followingRedirects()
+            ->from(route('dashboard'))
+            ->post(route('households.appliances.store', $this->household->id), [
+                '_dialog' => 'dialog-add-appliance',
+                'name' => '',
+                'power_watt' => -5,
+            ])
+            ->assertOk()
+            ->assertSee('data-reopen-dialog="dialog-add-appliance"', false)
+            ->assertSee('The name field is required.');
+    }
+
+    public function test_appliance_can_be_updated_from_the_dashboard(): void
+    {
+        $appliance = $this->household->appliances->first();
+
+        $this->put(route('appliances.update', $appliance), [
+            'category_id' => $appliance->category_id,
+            'name' => 'AC Kamar Utama Baru',
+            'power_watt' => 500,
+            'quantity' => 1,
+            'daily_hours' => 6,
+            'days_per_month' => 30,
+            'usage_factor' => 0.7,
+        ])->assertRedirect()->assertSessionHas('status');
+
+        $this->assertDatabaseHas('appliances', ['id' => $appliance->id, 'name' => 'AC Kamar Utama Baru', 'power_watt' => 500]);
     }
 
     public function test_reanalyze_action_triggers_forward_chaining(): void

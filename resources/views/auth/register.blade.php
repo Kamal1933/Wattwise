@@ -8,31 +8,31 @@
     <form method="POST" action="{{ route('register.store') }}" class="space-y-4">
         @csrf
         <div>
-            <label for="name" class="block text-xs font-semibold text-slate-700 mb-1">Nama</label>
+            <label for="name" class="field-label">Nama</label>
             <input id="name" name="name" type="text" value="{{ old('name') }}" required autofocus autocomplete="name"
-                   class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                   class="field-input">
         </div>
         <div>
-            <label for="email" class="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+            <label for="email" class="field-label">Email</label>
             <input id="email" name="email" type="email" value="{{ old('email') }}" required autocomplete="email"
-                   class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                   class="field-input">
         </div>
         <div>
-            <label for="password" class="block text-xs font-semibold text-slate-700 mb-1">Kata sandi</label>
+            <label for="password" class="field-label">Kata sandi</label>
             <input id="password" name="password" type="password" required autocomplete="new-password"
-                   class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                   class="field-input">
         </div>
         <div>
-            <label for="password_confirmation" class="block text-xs font-semibold text-slate-700 mb-1">Ulangi kata sandi</label>
+            <label for="password_confirmation" class="field-label">Ulangi kata sandi</label>
             <input id="password_confirmation" name="password_confirmation" type="password" required autocomplete="new-password"
-                   class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                   class="field-input">
         </div>
-        <button type="submit" class="w-full py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button type="submit" class="btn-primary w-full">
             Daftar
         </button>
     </form>
 @endsection
 
 @section('footer')
-    Sudah punya akun? <a href="{{ route('login') }}" class="font-semibold text-blue-600 hover:underline">Masuk</a>
+    Sudah punya akun? <a href="{{ route('login') }}" class="font-semibold text-electric hover:underline">Masuk</a>
 @endsection

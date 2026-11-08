@@ -10,12 +10,13 @@ class ExampleTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Guests are sent to the login page, which renders successfully.
+     * The public landing page renders, while the dashboard sends guests to the login page.
      */
     public function test_the_application_returns_a_successful_response(): void
     {
-        $this->get('/')->assertRedirect(route('login'));
+        $this->get('/')->assertOk();
 
+        $this->get(route('dashboard'))->assertRedirect(route('login'));
         $this->get(route('login'))->assertOk();
     }
 }

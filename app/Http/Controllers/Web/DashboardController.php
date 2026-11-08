@@ -85,25 +85,26 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function storeHousehold(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'tariff_id' => ['required', 'exists:tariff_rates,id'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'occupant_count' => ['required', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        $household = $request->user()->households()->create($validated);
+
+        return redirect()->route('dashboard', ['household_id' => $household->id])
+            ->with('status', "Rumah tangga {$household->name} ditambahkan. Mulai dengan menambahkan peralatan listrik.");
+    }
+
     public function reanalyze(Household $household): RedirectResponse
     {
         Gate::authorize('update', $household);
 
-        $startOfMonth = now()->startOfMonth();
-        $endOfMonth = now()->endOfMonth();
-        $periodName = now()->translatedFormat('F Y');
-
-        $period = $this->calcEngine->calculateHouseholdPeriod(
-            $household,
-            $startOfMonth,
-            $endOfMonth,
-            $periodName
-        );
-
-        $this->expertEngine->evaluatePeriod($period);
-
-        return redirect()->route('dashboard', ['household_id' => $household->id])
-            ->with('status', 'Analisis sistem pakar berhasil diperbarui!');
+        return $this->refreshAnalysis($household, 'Analisis diperbarui dengan data peralatan terbaru.');
     }
 
     public function storeAppliance(Request $request, Household $household): RedirectResponse
@@ -121,10 +122,9 @@ class DashboardController extends Controller
         ]);
 
         $validated['is_active'] = true;
-        $household->appliances()->create($validated);
+        $appliance = $household->appliances()->create($validated);
 
-        // Auto recalculate active period
-        return $this->reanalyze($household);
+        return $this->refreshAnalysis($household, "{$appliance->name} ditambahkan. Analisis sudah diperbarui.");
     }
 
     public function updateAppliance(Request $request, Appliance $appliance): RedirectResponse
@@ -143,7 +143,7 @@ class DashboardController extends Controller
 
         $appliance->update($validated);
 
-        return $this->reanalyze($appliance->household);
+        return $this->refreshAnalysis($appliance->household, "Perubahan {$appliance->name} disimpan. Analisis sudah diperbarui.");
     }
 
     public function destroyAppliance(Appliance $appliance): RedirectResponse
@@ -153,7 +153,7 @@ class DashboardController extends Controller
 
         $appliance->delete();
 
-        return $this->reanalyze($household);
+        return $this->refreshAnalysis($household, "{$appliance->name} dihapus. Analisis sudah diperbarui.");
     }
 
     public function storeMeterReading(Request $request, Household $household): RedirectResponse
@@ -184,6 +184,24 @@ class DashboardController extends Controller
         );
 
         return redirect()->route('dashboard', ['household_id' => $household->id])
-            ->with('status', 'Pencatatan meteran listrik riil berhasil disimpan!');
+            ->with('status', 'Catatan meteran disimpan.');
+    }
+
+    /**
+     * Recalculate the current month's period, rerun inference, and return to the dashboard.
+     */
+    protected function refreshAnalysis(Household $household, string $message): RedirectResponse
+    {
+        $period = $this->calcEngine->calculateHouseholdPeriod(
+            $household,
+            now()->startOfMonth(),
+            now()->endOfMonth(),
+            now()->translatedFormat('F Y')
+        );
+
+        $this->expertEngine->evaluatePeriod($period);
+
+        return redirect()->route('dashboard', ['household_id' => $household->id])
+            ->with('status', $message);
     }
 }
