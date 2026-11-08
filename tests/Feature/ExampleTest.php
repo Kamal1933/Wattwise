@@ -10,12 +10,12 @@ class ExampleTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * A basic test example.
+     * Guests are sent to the login page, which renders successfully.
      */
     public function test_the_application_returns_a_successful_response(): void
     {
-        $response = $this->get('/');
+        $this->get('/')->assertRedirect(route('login'));
 
-        $response->assertStatus(200);
+        $this->get(route('login'))->assertOk();
     }
 }

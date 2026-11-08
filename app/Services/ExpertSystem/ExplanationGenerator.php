@@ -3,67 +3,191 @@
 namespace App\Services\ExpertSystem;
 
 use App\Models\ExpertRule;
+use App\Models\RuleCondition;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class ExplanationGenerator
 {
     /**
-     * Generate explainable evidence text showing exact mathematical calculations.
+     * Human-readable metadata for known working-memory facts.
+     * Facts not listed here (e.g. facts derived by rules) fall back to a humanized name.
+     *
+     * @var array<string, array{label: string, unit?: string, decimals?: int, percent?: bool, currency?: bool}>
+     */
+    public const FACT_LABELS = [
+        'appliance_name' => ['label' => 'nama peralatan'],
+        'category_code' => ['label' => 'kategori'],
+        'category_name' => ['label' => 'nama kategori'],
+        'power_watt' => ['label' => 'daya', 'unit' => 'W', 'decimals' => 0],
+        'quantity' => ['label' => 'jumlah unit', 'unit' => 'unit', 'decimals' => 0],
+        'daily_hours' => ['label' => 'durasi pemakaian', 'unit' => 'jam/hari', 'decimals' => 1],
+        'days_per_month' => ['label' => 'hari pemakaian', 'unit' => 'hari/bulan', 'decimals' => 0],
+        'usage_factor' => ['label' => 'faktor pemakaian', 'decimals' => 2],
+        'monthly_kwh' => ['label' => 'konsumsi bulanan', 'unit' => 'kWh', 'decimals' => 1],
+        'monthly_cost' => ['label' => 'biaya bulanan', 'decimals' => 0, 'currency' => true],
+        'appliance_share_pct' => ['label' => 'porsi dari total konsumsi rumah', 'unit' => '%', 'decimals' => 1],
+        'rate_per_kwh' => ['label' => 'tarif per kWh', 'decimals' => 2, 'currency' => true],
+        'applied_rate_per_kwh' => ['label' => 'tarif per kWh', 'decimals' => 2, 'currency' => true],
+        'total_estimated_kwh' => ['label' => 'total konsumsi rumah', 'unit' => 'kWh', 'decimals' => 1],
+        'total_estimated_cost' => ['label' => 'total biaya rumah', 'decimals' => 0, 'currency' => true],
+        'tariff_code' => ['label' => 'golongan tarif'],
+        'power_limit_va' => ['label' => 'daya kontrak PLN', 'unit' => 'VA', 'decimals' => 0],
+        'simultaneous_active_watt' => ['label' => 'total daya peralatan aktif', 'unit' => 'W', 'decimals' => 0],
+        'simultaneous_load_ratio' => ['label' => 'rasio beban terhadap daya kontrak', 'decimals' => 1, 'percent' => true],
+        'occupant_count' => ['label' => 'jumlah penghuni', 'unit' => 'orang', 'decimals' => 0],
+        'appliance_count' => ['label' => 'jumlah peralatan aktif', 'unit' => 'unit', 'decimals' => 0],
+        'is_heavy_consumer' => ['label' => 'peralatan berkonsumsi tinggi'],
+        'capacity_at_risk' => ['label' => 'rumah berisiko kelebihan beban'],
+    ];
+
+    /**
+     * @var array<string, string>
+     */
+    public const OPERATOR_LABELS = [
+        '>' => '>',
+        '>=' => '≥',
+        '<' => '<',
+        '<=' => '≤',
+        '==' => '=',
+        '!=' => '≠',
+        'IN' => 'salah satu dari',
+        'CONTAINS' => 'mengandung',
+    ];
+
+    /**
+     * Build the evidence text from the rule conditions that were actually satisfied,
+     * so the explanation always matches the thresholds stored in the database.
      *
      * @param  array<string, mixed>  $facts
+     * @param  Collection<int, RuleCondition>|null  $matchedConditions  The satisfied condition group; defaults to the rule's first group.
+     * @param  array<string, string>  $derivedFrom  Fact name => code of the rule that derived it.
      */
-    public function generateEvidence(ExpertRule $rule, array $facts): string
-    {
-        $applianceName = $facts['appliance_name'] ?? 'Peralatan';
-        $monthlyKwh = isset($facts['monthly_kwh']) ? number_format((float) $facts['monthly_kwh'], 1, ',', '.') : '0';
-        $sharePct = isset($facts['appliance_share_pct']) ? number_format((float) $facts['appliance_share_pct'], 1, ',', '.') : '0';
-        $dailyHours = isset($facts['daily_hours']) ? number_format((float) $facts['daily_hours'], 1, ',', '.') : '0';
-        $powerWatt = isset($facts['power_watt']) ? number_format((float) $facts['power_watt'], 0, ',', '.') : '0';
-        $powerLimitVa = isset($facts['power_limit_va']) ? number_format((float) $facts['power_limit_va'], 0, ',', '.') : '0';
-        $simultaneousWatt = isset($facts['simultaneous_active_watt']) ? number_format((float) $facts['simultaneous_active_watt'], 0, ',', '.') : '0';
-        $loadRatioPct = isset($facts['simultaneous_load_ratio']) ? number_format((float) $facts['simultaneous_load_ratio'] * 100, 1, ',', '.') : '0';
+    public function generateEvidence(
+        ExpertRule $rule,
+        array $facts,
+        ?Collection $matchedConditions = null,
+        array $derivedFrom = []
+    ): string {
+        $matchedConditions ??= $rule->conditions
+            ->groupBy(fn (RuleCondition $condition): int => (int) ($condition->condition_group ?? 1))
+            ->first() ?? collect();
 
-        switch ($rule->rule_code) {
-            case 'R-DOM-01':
-                return "Bukti Inferensi: Peralatan '{$applianceName}' menyerap {$sharePct}% ({$monthlyKwh} kWh) dari total listrik rumah tangga. Ini melebihi ambang batas aturan dominansi (>= 35.0%).";
+        $subject = $rule->isHouseholdScoped()
+            ? 'rumah tangga'
+            : "'".($facts['appliance_name'] ?? 'Peralatan')."'";
 
-            case 'R-COOL-01':
-                return "Bukti Inferensi: Pendingin '{$applianceName}' aktif selama {$dailyHours} jam per hari (ambang batas >= 8.0 jam) dengan estimasi serapan {$monthlyKwh} kWh/bulan.";
+        $clauses = $matchedConditions->map(function (RuleCondition $condition) use ($facts, $derivedFrom): string {
+            $param = $condition->parameter_name;
+            $clause = sprintf(
+                '%s = %s (syarat: %s %s)',
+                $this->labelFor($param),
+                $this->formatFact($param, $facts[$param] ?? null),
+                self::OPERATOR_LABELS[$condition->operator] ?? $condition->operator,
+                $this->formatComparisonValue($param, $condition->operator, $condition->comparison_value)
+            );
 
-            case 'R-VAMP-01':
-                return "Bukti Inferensi: Perangkat elektronik '{$applianceName}' terdeteksi beroperasi standby terus menerus selama {$dailyHours} jam/hari tanpa pemutus arus fisik.";
+            if (isset($derivedFrom[$param])) {
+                $clause .= " — fakta turunan dari aturan {$derivedFrom[$param]}";
+            }
 
-            case 'R-LIGHT-01':
-                return "Bukti Inferensi: Lampu '{$applianceName}' memiliki daya tinggi {$powerWatt} W (ambang batas lampu konvensional >= 25.0 W).";
+            return $clause;
+        })->all();
 
-            case 'R-WATER-01':
-                return "Bukti Inferensi: Peralatan air '{$applianceName}' berdaya {$powerWatt} W menyedot beban kumulatif {$monthlyKwh} kWh/bulan (ambang batas >= 40.0 kWh).";
+        $evidence = "Bukti Inferensi: aturan {$rule->rule_code} terpicu pada {$subject} karena ".implode('; ', $clauses).'.';
 
-            case 'R-CAP-01':
-                return "Bukti Inferensi: Total daya serap peralatan aktif ({$simultaneousWatt} W) mencapai {$loadRatioPct}% dari kapasitas daya kontrak PLN ({$powerLimitVa} VA).";
-
-            default:
-                return "Bukti Inferensi: Aturan {$rule->rule_code} terpenuhi berdasarkan parameter kondisi yang sesuai dengan data inventaris aktif.";
+        $groupCount = $rule->conditions->pluck('condition_group')->unique()->count();
+        if ($groupCount > 1) {
+            $groupNumber = $matchedConditions->first()?->condition_group ?? 1;
+            $evidence .= " Terpenuhi lewat kelompok kondisi #{$groupNumber} dari {$groupCount} alternatif (OR).";
         }
+
+        return $evidence;
     }
 
     /**
-     * Interpolate variables in recommendation template.
+     * Interpolate ":fact_name" placeholders in a recommendation template with formatted fact values.
+     * Units are left to the template text, so only the number is inserted.
      *
      * @param  array<string, mixed>  $facts
      */
     public function formatRecommendation(string $template, array $facts): string
     {
-        $replacements = [
-            ':appliance_name' => $facts['appliance_name'] ?? 'Peralatan',
-            ':monthly_kwh' => isset($facts['monthly_kwh']) ? number_format((float) $facts['monthly_kwh'], 1, ',', '.') : '0',
-            ':appliance_share_pct' => isset($facts['appliance_share_pct']) ? number_format((float) $facts['appliance_share_pct'], 1, ',', '.') : '0',
-            ':daily_hours' => isset($facts['daily_hours']) ? number_format((float) $facts['daily_hours'], 1, ',', '.') : '0',
-            ':power_watt' => isset($facts['power_watt']) ? number_format((float) $facts['power_watt'], 0, ',', '.') : '0',
-            ':power_limit_va' => isset($facts['power_limit_va']) ? number_format((float) $facts['power_limit_va'], 0, ',', '.') : '0',
-            ':simultaneous_active_watt' => isset($facts['simultaneous_active_watt']) ? number_format((float) $facts['simultaneous_active_watt'], 0, ',', '.') : '0',
-        ];
+        $placeholders = array_keys($facts);
+        usort($placeholders, fn (string $a, string $b): int => strlen($b) <=> strlen($a));
 
-        return str_replace(array_keys($replacements), array_values($replacements), $template);
+        $replacements = [];
+        foreach ($placeholders as $param) {
+            $replacements[':'.$param] = $this->formatFact($param, $facts[$param], withUnit: false);
+        }
+
+        return strtr($template, $replacements);
+    }
+
+    /**
+     * Human-readable label of a fact.
+     */
+    public function labelFor(string $param): string
+    {
+        return self::FACT_LABELS[$param]['label'] ?? Str::of($param)->replace('_', ' ')->toString();
+    }
+
+    /**
+     * Format a fact value for display (Indonesian number format, units, booleans as ya/tidak).
+     */
+    public function formatFact(string $param, mixed $value, bool $withUnit = true): string
+    {
+        if ($value === null) {
+            return '-';
+        }
+
+        if (is_bool($value) || in_array($value, ['true', 'false'], true)) {
+            return in_array($value, [true, 'true'], true) ? 'ya' : 'tidak';
+        }
+
+        if (! is_numeric($value)) {
+            return (string) $value;
+        }
+
+        $meta = self::FACT_LABELS[$param] ?? ['label' => $param];
+        $number = (float) $value;
+
+        if ($meta['percent'] ?? false) {
+            return number_format($number * 100, $meta['decimals'] ?? 1, ',', '.').($withUnit ? '%' : '');
+        }
+
+        $formatted = number_format($number, $meta['decimals'] ?? $this->decimalsFor($number), ',', '.');
+
+        if (! $withUnit) {
+            return $formatted;
+        }
+
+        if ($meta['currency'] ?? false) {
+            return 'Rp'.$formatted;
+        }
+
+        return isset($meta['unit']) ? "{$formatted} {$meta['unit']}" : $formatted;
+    }
+
+    /**
+     * Format the threshold side of a condition.
+     */
+    protected function formatComparisonValue(string $param, string $operator, string $comparisonValue): string
+    {
+        if ($operator === 'IN') {
+            return implode(', ', array_map('trim', explode(',', $comparisonValue)));
+        }
+
+        if ($operator === 'CONTAINS') {
+            return "'{$comparisonValue}'";
+        }
+
+        return $this->formatFact($param, $comparisonValue);
+    }
+
+    protected function decimalsFor(float $number): int
+    {
+        return floor($number) === $number ? 0 : 2;
     }
 
     /**
@@ -88,7 +212,7 @@ class ExplanationGenerator
                 break;
 
             case 'R-COOL-01':
-                // Setting thermostat 2-3°C higher saves ~15% AC consumption
+                // Setting thermostat 2-3°C higher saves roughly 15-20% of AC consumption (18% used)
                 $savedKwh = $monthlyKwh * 0.18;
                 break;
 
@@ -109,7 +233,8 @@ class ExplanationGenerator
                 break;
 
             case 'R-CAP-01':
-                // Capacity overload prevention does not directly reduce baseline kWh, but prevents penalties/tripping
+            case 'R-PEAK-01':
+                // Load scheduling prevents tripping but does not directly reduce monthly kWh
                 $savedKwh = 0.0;
                 break;
 

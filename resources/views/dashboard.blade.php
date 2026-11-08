@@ -109,9 +109,13 @@
                     <!-- User Profile Pill -->
                     <div class="flex items-center gap-2 pl-3 border-l border-slate-200">
                         <div class="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-xs">
-                            KB
+                            {{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr(auth()->user()->name, 0, 2)) }}
                         </div>
-                        <span class="text-xs font-semibold text-slate-700 hidden lg:inline">Budi Santoso</span>
+                        <span class="text-xs font-semibold text-slate-700 hidden lg:inline">{{ auth()->user()->name }}</span>
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit" class="text-xs font-semibold text-slate-500 hover:text-red-600 transition-colors">Keluar</button>
+                        </form>
                     </div>
                 </div>
             </div>

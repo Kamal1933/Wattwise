@@ -65,6 +65,7 @@ class CalculationController extends Controller
             'message' => 'Expert analysis and forward chaining completed',
             'period' => $period->load(['items.appliance.category', 'household.tariff']),
             'recommendations' => $recommendations,
+            'inference_trace' => $this->expertEngine->lastTrace(),
         ], 201);
     }
 

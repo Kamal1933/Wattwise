@@ -7,6 +7,7 @@ use App\Models\CalculationItem;
 use App\Models\CalculationPeriod;
 use App\Models\Household;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class EnergyCalculationEngine
@@ -44,6 +45,10 @@ class EnergyCalculationEngine
 
     /**
      * Compute full energy calculation for a household and persist calculation period with breakdown items.
+     *
+     * Recalculating the same household and date range updates the existing period in place
+     * (replacing its items and stale recommendations) instead of creating a duplicate,
+     * so linked meter readings keep pointing at the same period.
      *
      * @param  array<string, mixed>  $assumptions
      */
@@ -106,39 +111,52 @@ class EnergyCalculationEngine
             'calculated_at' => now()->toIso8601String(),
         ], $assumptions);
 
-        // Persist CalculationPeriod
-        $period = CalculationPeriod::create([
-            'household_id' => $household->id,
-            'period_name' => $periodName,
-            'start_date' => $startDate->toDateString(),
-            'end_date' => $endDate->toDateString(),
-            'total_estimated_kwh' => round($totalEstimatedKwh, 3),
-            'total_estimated_cost' => round($totalEstimatedCost, 2),
-            'applied_rate_per_kwh' => (float) $tariff->rate_per_kwh,
-            'calculation_assumptions' => $mergedAssumptions,
-        ]);
+        $period = DB::transaction(function () use ($household, $startDate, $endDate, $periodName, $totalEstimatedKwh, $totalEstimatedCost, $tariff, $mergedAssumptions, $rawItems): CalculationPeriod {
+            $period = CalculationPeriod::query()
+                ->where('household_id', $household->id)
+                ->whereDate('start_date', $startDate->toDateString())
+                ->whereDate('end_date', $endDate->toDateString())
+                ->lockForUpdate()
+                ->first() ?? new CalculationPeriod([
+                    'household_id' => $household->id,
+                    'start_date' => $startDate->toDateString(),
+                    'end_date' => $endDate->toDateString(),
+                ]);
 
-        // Persist CalculationItems
-        foreach ($rawItems as $item) {
-            $sharePercentage = $totalEstimatedKwh > 0
-                ? round(($item['monthly_kwh'] / $totalEstimatedKwh) * 100, 2)
-                : 0.0;
+            $period->fill([
+                'period_name' => $periodName,
+                'total_estimated_kwh' => round($totalEstimatedKwh, 3),
+                'total_estimated_cost' => round($totalEstimatedCost, 2),
+                'applied_rate_per_kwh' => (float) $tariff->rate_per_kwh,
+                'calculation_assumptions' => $mergedAssumptions,
+            ])->save();
 
-            CalculationItem::create([
-                'calculation_period_id' => $period->id,
-                'appliance_id' => $item['appliance']->id,
-                'power_watt' => (float) $item['appliance']->power_watt,
-                'quantity' => (int) $item['appliance']->quantity,
-                'daily_hours' => (float) $item['appliance']->daily_hours,
-                'days_per_month' => (int) $item['appliance']->days_per_month,
-                'usage_factor' => (float) $item['appliance']->usage_factor,
-                'monthly_kwh' => $item['monthly_kwh'],
-                'monthly_cost' => $item['monthly_cost'],
-                'percentage_of_total' => $sharePercentage,
-            ]);
-        }
+            $period->items()->delete();
+            $period->recommendations()->delete();
 
-        return $period->load(['items.appliance.category', 'household.tariff']);
+            foreach ($rawItems as $item) {
+                $sharePercentage = $totalEstimatedKwh > 0
+                    ? round(($item['monthly_kwh'] / $totalEstimatedKwh) * 100, 2)
+                    : 0.0;
+
+                CalculationItem::create([
+                    'calculation_period_id' => $period->id,
+                    'appliance_id' => $item['appliance']->id,
+                    'power_watt' => (float) $item['appliance']->power_watt,
+                    'quantity' => (int) $item['appliance']->quantity,
+                    'daily_hours' => (float) $item['appliance']->daily_hours,
+                    'days_per_month' => (int) $item['appliance']->days_per_month,
+                    'usage_factor' => (float) $item['appliance']->usage_factor,
+                    'monthly_kwh' => $item['monthly_kwh'],
+                    'monthly_cost' => $item['monthly_cost'],
+                    'percentage_of_total' => $sharePercentage,
+                ]);
+            }
+
+            return $period;
+        });
+
+        return $period->unsetRelations()->load(['items.appliance.category', 'household.tariff']);
     }
 
     /**

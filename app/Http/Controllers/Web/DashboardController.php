@@ -12,6 +12,7 @@ use App\Services\Calculation\EnergyCalculationEngine;
 use App\Services\ExpertSystem\ForwardChainingEngine;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -23,11 +24,19 @@ class DashboardController extends Controller
 
     public function index(Request $request): View
     {
-        $households = Household::with(['tariff', 'appliances.category'])->get();
+        $user = $request->user();
+        $households = Household::with(['tariff', 'appliances.category'])
+            ->when(! $user->isAdmin(), fn ($query) => $query->where('user_id', $user->id))
+            ->get();
         $activeHouseholdId = $request->query('household_id') ?? $households->first()?->id;
 
-        $household = Household::with(['tariff', 'appliances.category', 'actualMeterReadings'])
-            ->find($activeHouseholdId) ?? $households->first();
+        $household = $activeHouseholdId
+            ? Household::with(['tariff', 'appliances.category', 'actualMeterReadings'])->findOrFail($activeHouseholdId)
+            : null;
+
+        if ($household) {
+            Gate::authorize('view', $household);
+        }
 
         $categories = ApplianceCategory::all();
         $tariffs = TariffRate::where('is_active', true)->get();
@@ -78,6 +87,8 @@ class DashboardController extends Controller
 
     public function reanalyze(Household $household): RedirectResponse
     {
+        Gate::authorize('update', $household);
+
         $startOfMonth = now()->startOfMonth();
         $endOfMonth = now()->endOfMonth();
         $periodName = now()->translatedFormat('F Y');
@@ -97,6 +108,8 @@ class DashboardController extends Controller
 
     public function storeAppliance(Request $request, Household $household): RedirectResponse
     {
+        Gate::authorize('update', $household);
+
         $validated = $request->validate([
             'category_id' => ['required', 'exists:appliance_categories,id'],
             'name' => ['required', 'string', 'max:150'],
@@ -116,6 +129,8 @@ class DashboardController extends Controller
 
     public function updateAppliance(Request $request, Appliance $appliance): RedirectResponse
     {
+        Gate::authorize('update', $appliance->household);
+
         $validated = $request->validate([
             'category_id' => ['required', 'exists:appliance_categories,id'],
             'name' => ['required', 'string', 'max:150'],
@@ -134,6 +149,8 @@ class DashboardController extends Controller
     public function destroyAppliance(Appliance $appliance): RedirectResponse
     {
         $household = $appliance->household;
+        Gate::authorize('update', $household);
+
         $appliance->delete();
 
         return $this->reanalyze($household);
@@ -141,6 +158,8 @@ class DashboardController extends Controller
 
     public function storeMeterReading(Request $request, Household $household): RedirectResponse
     {
+        Gate::authorize('update', $household);
+
         $validated = $request->validate([
             'reading_date' => ['required', 'date'],
             'meter_start_kwh' => ['required', 'numeric', 'min:0'],
@@ -151,7 +170,7 @@ class DashboardController extends Controller
         ]);
 
         $period = ! empty($validated['calculation_period_id'])
-            ? CalculationPeriod::find($validated['calculation_period_id'])
+            ? CalculationPeriod::where('household_id', $household->id)->findOrFail($validated['calculation_period_id'])
             : null;
 
         $this->calcEngine->recordActualReading(

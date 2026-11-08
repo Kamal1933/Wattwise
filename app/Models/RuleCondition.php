@@ -12,11 +12,18 @@ class RuleCondition extends Model
 
     protected $fillable = [
         'rule_id',
+        'condition_group',
         'parameter_name',
         'operator',
         'comparison_value',
-        'logical_operator',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'condition_group' => 'integer',
+        ];
+    }
 
     public function rule(): BelongsTo
     {
