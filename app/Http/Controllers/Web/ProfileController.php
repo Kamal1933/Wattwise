@@ -38,6 +38,29 @@ class ProfileController extends Controller
         return redirect()->route('profile.index')->with('status', 'Profil berhasil diperbarui.');
     }
 
+    public function updatePhoto(Request $request): RedirectResponse
+    {
+        $request->validateWithBag('photo', [
+            'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+        ]);
+
+        $user = $request->user();
+        $path = $request->file('photo')->store('profiles', 'public');
+        $user->deletePhoto();
+        $user->update(['photo_path' => $path]);
+
+        return redirect()->route('profile.index')->with('status', 'Foto profil diperbarui.');
+    }
+
+    public function destroyPhoto(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $user->deletePhoto();
+        $user->update(['photo_path' => null]);
+
+        return redirect()->route('profile.index')->with('status', 'Foto profil dihapus.');
+    }
+
     public function updatePassword(Request $request): RedirectResponse
     {
         $validated = $request->validateWithBag('password', [

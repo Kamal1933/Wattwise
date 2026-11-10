@@ -67,7 +67,7 @@
                     <div class="mt-6 flex h-56 items-end gap-3 overflow-x-auto border-b border-slate-200 pb-0" role="img" aria-label="Grafik batang konsumsi per bulan">
                         @foreach ($rows as $row)
                             <div class="flex min-w-12 flex-1 flex-col items-center gap-1">
-                                <span class="text-[11px] font-semibold text-navy tabular-nums">{{ $number($row['kwh'], 0) }}</span>
+                                <span class="text-[0.6875rem] font-semibold text-navy tabular-nums">{{ $number($row['kwh'], 0) }}</span>
                                 <div class="flex h-44 w-full items-end justify-center gap-1">
                                     <div class="w-1/2 max-w-6 rounded-t bg-electric" style="height: {{ max(2, $row['kwh'] / $maxKwh * 100) }}%" title="Perkiraan {{ $number($row['kwh']) }} kWh"></div>
                                     @if ($row['actual'] !== null)

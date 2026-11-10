@@ -407,3 +407,28 @@ document.addEventListener('click', (event) => {
         }
     });
 });
+
+const setupAvatarPreview = () => {
+    const input = document.querySelector('[data-avatar-input]');
+
+    if (!input) {
+        return;
+    }
+
+    input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        const preview = document.querySelector('[data-avatar-preview]');
+
+        if (!file || !preview) {
+            return;
+        }
+
+        preview.src = URL.createObjectURL(file);
+        preview.classList.remove('hidden');
+        document.querySelector('[data-avatar-current]')?.classList.add('hidden');
+        document.querySelector('[data-avatar-save]')?.classList.remove('hidden');
+        document.querySelector('[data-avatar-label]').textContent = 'Pilih lagi';
+    });
+};
+
+onReady(setupAvatarPreview);

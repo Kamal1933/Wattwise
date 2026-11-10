@@ -29,6 +29,19 @@
         scroll-padding-top: 5rem;
     }
 
+    /*
+     * Scale the whole interface with the window on wide screens (or when the
+     * browser is zoomed out), so sidebar, header and content keep the same
+     * proportions instead of shrinking into a narrow column.
+     * 1vw equals 16px at 1600px wide; capped so text never becomes huge.
+     * Below 1600px the normal responsive layout applies, so zooming in still enlarges text.
+     */
+    @media (min-width: 100rem) {
+        html {
+            font-size: min(1vw, 2.5rem);
+        }
+    }
+
     body {
         @apply bg-ice text-ink font-sans antialiased;
         font-feature-settings: 'cv11', 'ss01';

@@ -7,18 +7,45 @@
 
 @section('content')
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <section class="card p-6 xl:col-span-2" aria-label="Identitas akun">
-            <div class="flex flex-wrap items-center gap-4">
-                <span class="grid size-14 place-items-center rounded-full bg-navy text-xl font-bold text-white">{{ mb_strtoupper(mb_substr($user->name, 0, 1)) }}</span>
-                <div class="min-w-0">
-                    <p class="text-lg font-bold text-navy">{{ $user->name }}</p>
-                    <p class="text-sm text-slate-500">{{ $user->email }}</p>
+        <section class="card p-6 xl:col-span-2" aria-labelledby="profile-photo-title">
+            <div class="flex flex-col gap-6 md:flex-row md:items-center">
+                <div class="flex items-center gap-5">
+                    <div class="relative">
+                        <x-user-avatar :user="$user" size="size-24" text="text-3xl" data-avatar-current />
+                        <img src="" alt="Pratinjau foto baru" data-avatar-preview class="hidden size-24 rounded-full object-cover ring-4 ring-electric-100">
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-lg font-bold text-navy">{{ $user->name }}</p>
+                        <p class="truncate text-sm text-slate-500">{{ $user->email }}</p>
+                        <p class="mt-1 text-xs text-slate-500">
+                            {{ $user->isAdmin() ? 'Administrator' : 'Pengguna' }},
+                            {{ $user->households_count }} rumah tangga,
+                            bergabung {{ $user->created_at?->translatedFormat('j M Y') }}
+                        </p>
+                    </div>
                 </div>
-                <dl class="ml-auto flex gap-6 text-sm">
-                    <div><dt class="text-slate-500">Peran</dt><dd class="font-semibold text-ink">{{ $user->role === 'admin' ? 'Administrator' : 'Pengguna' }}</dd></div>
-                    <div><dt class="text-slate-500">Rumah tangga</dt><dd class="font-semibold text-ink tabular-nums">{{ $user->households_count }}</dd></div>
-                    <div><dt class="text-slate-500">Bergabung</dt><dd class="font-semibold text-ink">{{ $user->created_at?->translatedFormat('j M Y') }}</dd></div>
-                </dl>
+
+                <div class="md:ml-auto md:w-96">
+                    <h2 id="profile-photo-title" class="text-sm font-semibold text-ink">Foto profil</h2>
+                    <form method="POST" action="{{ route('profile.photo.update') }}" enctype="multipart/form-data" class="mt-2 flex flex-wrap items-center gap-2">
+                        @csrf
+                        <label class="btn-secondary cursor-pointer">
+                            <x-icon name="camera" class="size-4" />
+                            <span data-avatar-label>{{ $user->photoUrl() ? 'Ganti foto' : 'Pilih foto' }}</span>
+                            <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required class="sr-only" data-avatar-input>
+                        </label>
+                        <button type="submit" class="btn-primary hidden" data-avatar-save>Simpan foto</button>
+                    </form>
+                    @if ($user->photoUrl())
+                        <form method="POST" action="{{ route('profile.photo.destroy') }}" class="mt-2" onsubmit="return confirm('Hapus foto profil?')">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="text-sm font-medium text-red-700 hover:underline">Hapus foto</button>
+                        </form>
+                    @endif
+                    <p class="field-hint mt-2">Format JPG, PNG, atau WEBP, maksimal 2 MB. Tanpa foto, inisial nama yang ditampilkan.</p>
+                    @error('photo', 'photo') <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
+                </div>
             </div>
         </section>
 

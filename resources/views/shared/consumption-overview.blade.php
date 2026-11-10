@@ -21,7 +21,7 @@
         </div>
 
         <div class="mt-6 grid grid-cols-1 items-center gap-6 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-            <div class="relative mx-auto w-full max-w-[220px]">
+            <div class="relative mx-auto w-full max-w-[13.75rem]">
                 <svg viewBox="0 0 42 42" class="w-full -rotate-0" role="img" aria-label="Diagram donat konsumsi per perangkat">
                     <circle cx="21" cy="21" r="{{ $radius }}" fill="none" stroke="#F1F5F9" stroke-width="6"/>
                     @foreach ($summary->chartSegments as $segment)

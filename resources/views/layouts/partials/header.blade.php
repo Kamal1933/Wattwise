@@ -1,7 +1,5 @@
 @php
     $user = auth()->user();
-    $userInitials = collect(explode(' ', $user->name))->filter()->take(2)
-        ->map(fn ($word) => \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($word, 0, 1)))->implode('');
     $crumbs = $breadcrumbs ?? [];
 @endphp
 
@@ -37,7 +35,7 @@
                 <a href="{{ route('recommendations.index') }}" class="relative grid size-10 place-items-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50" title="{{ $summary->urgentCount }} saran mendesak">
                     <x-icon name="bell" class="size-5" />
                     @if ($summary->urgentCount > 0)
-                        <span class="absolute -top-0.5 -right-0.5 grid size-5 place-items-center rounded-full bg-red-500 text-[11px] font-bold text-white ring-2 ring-white">{{ $summary->urgentCount }}</span>
+                        <span class="absolute -top-0.5 -right-0.5 grid size-5 place-items-center rounded-full bg-red-500 text-[0.6875rem] font-bold text-white ring-2 ring-white">{{ $summary->urgentCount }}</span>
                     @endif
                     <span class="sr-only">{{ $summary->urgentCount }} saran mendesak</span>
                 </a>
@@ -45,7 +43,7 @@
 
             <details class="relative" data-user-menu>
                 <summary class="flex cursor-pointer list-none items-center gap-2 rounded-full border border-slate-200 bg-white py-1 pr-3 pl-1 hover:bg-slate-50">
-                    <span class="grid size-8 place-items-center rounded-full bg-gradient-to-br from-sky-400 to-electric text-xs font-bold text-white">{{ $userInitials }}</span>
+                    <x-user-avatar :user="$user" />
                     <span class="hidden max-w-44 truncate text-sm font-semibold text-ink sm:inline">{{ $user->name }}</span>
                     <x-icon name="chevron" class="size-4 rotate-90 text-slate-500" />
                 </summary>
@@ -54,10 +52,10 @@
                         <p class="truncate text-sm font-semibold text-ink">{{ $user->name }}</p>
                         <p class="truncate text-xs text-slate-500">{{ $user->isAdmin() ? 'Administrator' : $user->email }}</p>
                     </div>
-                    <a href="{{ route('profile.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-ice">
+                    <a href="{{ route('profile.index') }}" @if (request()->routeIs('profile.*')) aria-current="page" @endif class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-ice aria-[current=page]:bg-electric-50 aria-[current=page]:font-semibold aria-[current=page]:text-electric">
                         <x-icon name="user" class="size-4" /> Profil pengguna
                     </a>
-                    <a href="{{ route('settings.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-ice">
+                    <a href="{{ route('settings.index') }}" @if (request()->routeIs('settings.*')) aria-current="page" @endif class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-ice aria-[current=page]:bg-electric-50 aria-[current=page]:font-semibold aria-[current=page]:text-electric">
                         <x-icon name="cog" class="size-4" /> Pengaturan
                     </a>
                     <a href="{{ route('home') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-ice">

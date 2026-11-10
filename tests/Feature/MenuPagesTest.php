@@ -54,13 +54,13 @@ class MenuPagesTest extends TestCase
     {
         $response = $this->get(route($route))->assertOk()->assertSee($title);
 
-        // Shared sidebar on every page with all menu links and logout.
+        // Sidebar (main menus) and header user menu (profile, settings) on every page, plus logout.
         foreach (array_keys(self::menuPages()) as $key) {
             $response->assertSee(route(self::menuPages()[$key][0]), false);
         }
         $response->assertSee(route('logout'), false);
 
-        // Exactly one sidebar link marked as current page (the breadcrumb's last crumb is a span).
+        // Exactly one menu link marked as current page (the breadcrumb's last crumb is a span).
         $this->assertSame(1, preg_match_all('#<a [^>]*aria-current="page"#', $response->getContent()));
         $this->assertMatchesRegularExpression(
             '#href="'.preg_quote(route($route), '#').'"[^>]*aria-current="page"#',
@@ -237,5 +237,18 @@ class MenuPagesTest extends TestCase
             'occupant_count' => 1,
         ])->assertForbidden();
         $this->delete(route('settings.households.destroy', $this->household))->assertForbidden();
+    }
+
+    public function test_profile_and_settings_live_in_the_user_menu_not_the_sidebar(): void
+    {
+        $html = $this->get(route('dashboard'))->assertOk()->getContent();
+        $start = strpos($html, 'id="sidebar"');
+        $sidebar = substr($html, $start, strpos($html, '</aside>') - $start);
+
+        $this->assertStringNotContainsString(route('profile.index'), $sidebar);
+        $this->assertStringNotContainsString(route('settings.index'), $sidebar);
+        $this->assertStringContainsString(route('logout'), $sidebar);
+        $this->assertStringContainsString(route('profile.index'), $html);
+        $this->assertStringContainsString(route('settings.index'), $html);
     }
 }

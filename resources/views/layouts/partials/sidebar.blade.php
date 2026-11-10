@@ -7,11 +7,7 @@
         ['route' => 'history.index', 'match' => 'history.*', 'label' => 'Riwayat Analisis', 'icon' => 'history'],
         ['route' => 'reports.index', 'match' => 'reports.*', 'label' => 'Laporan', 'icon' => 'report'],
     ];
-    $accountItems = [
-        ['route' => 'profile.index', 'match' => 'profile.*', 'label' => 'Profil', 'icon' => 'user'],
-        ['route' => 'settings.index', 'match' => 'settings.*', 'label' => 'Pengaturan', 'icon' => 'cog'],
-    ];
-    $linkClass = 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-semibold text-blue-100 hover:bg-white/10 hover:text-white aria-[current=page]:bg-electric aria-[current=page]:text-white aria-[current=page]:shadow-lg aria-[current=page]:shadow-electric/30';
+    $linkClass = 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-[0.9375rem] font-semibold text-blue-100 hover:bg-white/10 hover:text-white aria-[current=page]:bg-electric aria-[current=page]:text-white aria-[current=page]:shadow-lg aria-[current=page]:shadow-electric/30';
 @endphp
 
 <aside
@@ -64,37 +60,33 @@
             </a>
         @endforeach
 
-        <p class="px-3 pt-5 pb-1 text-xs font-medium text-blue-300/80">Akun</p>
-        @foreach ($accountItems as $item)
-            <a href="{{ route($item['route']) }}" @if (request()->routeIs($item['match'])) aria-current="page" @endif class="{{ $linkClass }}">
-                <x-icon :name="$item['icon']" class="size-5" />
-                {{ $item['label'] }}
-            </a>
-        @endforeach
-
         @if (auth()->user()->isAdmin())
             <a href="{{ route('dashboard.rules') }}" @if (request()->routeIs('dashboard.rules')) aria-current="page" @endif class="{{ $linkClass }}">
                 <x-icon name="rules" class="size-5" />
                 Basis Aturan
             </a>
         @endif
+    </nav>
 
-        <form method="POST" action="{{ route('logout') }}">
+    {{-- Bottom block: illustration directly above logout --}}
+    <div class="mt-auto space-y-3 px-4 pt-6 pb-5">
+        <figure class="relative overflow-hidden rounded-2xl ring-1 ring-white/10">
+            <picture>
+                <source srcset="{{ asset('images/sidebar/rumah-hemat-energi.webp') }}?v=2" type="image/webp">
+                <img src="{{ asset('images/sidebar/rumah-hemat-energi.jpg') }}?v=2" alt="Rumah hemat energi dengan panel surya" width="1024" height="768" loading="lazy" class="aspect-[2/1] w-full object-cover object-[50%_30%] [@media(min-height:52rem)_and_(max-aspect-ratio:19/10)]:aspect-[4/3]">
+            </picture>
+            <figcaption class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-navy-950/95 via-navy-950/70 to-transparent px-4 pt-10 pb-3.5">
+                <p class="text-sm leading-snug font-bold text-white">Hemat energi di rumah, lebih baik untuk masa depan</p>
+                <span class="mt-2 block h-1 w-10 rounded-full bg-sky-400"></span>
+            </figcaption>
+        </figure>
+
+        <form method="POST" action="{{ route('logout') }}" class="border-t border-white/10 pt-3">
             @csrf
-            <button type="submit" class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[15px] font-semibold text-blue-100 hover:bg-red-500/15 hover:text-red-200">
+            <button type="submit" class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[0.9375rem] font-semibold text-blue-100 hover:bg-red-500/15 hover:text-red-200">
                 <x-icon name="logout" class="size-5" />
                 Logout
             </button>
         </form>
-    </nav>
-
-    <div class="mt-auto hidden px-4 pt-6 pb-6 [@media(min-height:960px)]:block">
-        <div class="overflow-hidden rounded-2xl bg-white/5">
-            <x-house-scene variant="solar" class="w-full" />
-            <div class="px-4 pb-4">
-                <p class="text-[15px] leading-snug font-bold">Hemat energi di rumah, lebih baik untuk masa depan</p>
-                <span class="mt-3 block h-1 w-10 rounded-full bg-sky-400"></span>
-            </div>
-        </div>
     </div>
 </aside>
